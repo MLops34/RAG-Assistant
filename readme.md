@@ -2,7 +2,7 @@
 
 An AI-powered study scheduler that turns PDF syllabi into smart, personalized study plans using **Spaced Repetition**, **RAG**, and **optimization**. It respects your deep work windows and syncs directly to Google Calendar.
 
-Built for students (especially IIT-H and similar institutions) to reduce pre-exam stress and improve academic outcomes.
+Built for students (similar institutions) to reduce pre-exam stress and improve academic outcomes.
 
 ![Project Banner](https://via.placeholder.com/800x200?text=Personalized+Teaching+Assistant)  
 *(Replace with a nice screenshot of your UI/calendar view)*
