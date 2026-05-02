@@ -22,15 +22,16 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from core.llm_provider import get_llm_provider_config
+
 PathLike = Union[str, Path]
 
 DEFAULT_CHUNK_SIZE = 1200
 DEFAULT_CHUNK_OVERLAP = 200
 
 
-def _ensure_openai() -> None:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY is required for SyllabusRAG embeddings and chat.")
+def _ensure_llm_provider() -> None:
+    get_llm_provider_config()
 
 
 def _split_documents(documents: List[Document]) -> List[Document]:
@@ -84,13 +85,19 @@ class SyllabusRAG:
         chat_model: Optional[str] = None,
         k_retrieve: int = 6,
     ) -> None:
-        _ensure_openai()
+        _ensure_llm_provider()
+        provider = get_llm_provider_config()
         self._embedding_model = embedding_model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
         self._chat_model = chat_model or os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
         self._k = k_retrieve
-        self._embeddings = OpenAIEmbeddings(model=self._embedding_model)
+        self._embeddings = OpenAIEmbeddings(
+            model=self._embedding_model,
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+        )
         self._vectorstore: Optional[FAISS] = None
         self._store_id: str = str(uuid.uuid4())
+        self._provider = provider
 
     @property
     def store_id(self) -> str:
@@ -128,7 +135,12 @@ class SyllabusRAG:
             raise RuntimeError("No documents ingested. Call ingest_pdf or ingest_text first.")
 
         retriever = self.as_retriever()
-        llm = ChatOpenAI(model=self._chat_model, temperature=0)
+        llm = ChatOpenAI(
+            model=self._chat_model,
+            temperature=0,
+            api_key=self._provider.api_key,
+            base_url=self._provider.base_url,
+        )
 
         prompt = ChatPromptTemplate.from_messages(
             [
