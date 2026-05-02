@@ -110,3 +110,27 @@ pip install -r requirements.txt
 # 4. Set up environment variables
 cp .env.example .env
 # Edit .env with your API keys
+
+## Next.js + FastAPI UI (Phase 1)
+
+This repository now includes:
+
+- `backend/api.py` - FastAPI endpoints for parsing and schedule generation
+- `frontend/` - Next.js dashboard UI
+
+Run backend API:
+
+```bash
+uvicorn backend.api:app --reload --port 8000
+```
+
+Run frontend:
+
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
