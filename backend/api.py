@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from datetime import date, datetime, time
 from pathlib import Path
@@ -175,7 +176,7 @@ def chat_adjust_endpoint(payload: ChatAdjustRequest) -> dict:
     try:
         provider = get_llm_provider_config()
         llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model=os.getenv("OPENAI_PLANNER_CHAT_MODEL", "microsoft/phi-3-mini-128k-instruct"),
             temperature=0,
             api_key=provider.api_key,
             base_url=provider.base_url,
