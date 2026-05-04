@@ -88,7 +88,7 @@ class SyllabusRAG:
         _ensure_llm_provider()
         provider = get_llm_provider_config()
         self._embedding_model = embedding_model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-        self._chat_model = chat_model or os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+        self._chat_model = chat_model or os.getenv("OPENAI_CHAT_MODEL", "mistralai/mistral-7b-instruct")
         self._k = k_retrieve
         self._embeddings = OpenAIEmbeddings(
             model=self._embedding_model,

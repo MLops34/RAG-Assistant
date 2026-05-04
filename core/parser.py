@@ -135,7 +135,7 @@ def _parse_with_llm_single(text: str, max_chars: int = _DEFAULT_MAX_CHARS_FOR_LL
         truncated += "\n\n[... document truncated for model context ...]"
 
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_SYLLABUS_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_SYLLABUS_MODEL", "mistralai/mistral-7b-instruct"),
         temperature=0,
         api_key=provider.api_key,
         base_url=provider.base_url,
