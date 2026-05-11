@@ -23,18 +23,21 @@ def get_llm_provider_config() -> LLMProviderConfig:
     Supported setups:
     - OpenAI:
         OPENAI_API_KEY=...
+    - Groq:
+        GROQ_API_KEY=...
     - OpenRouter:
         OPENROUTER_API_KEY=...
         OPENAI_BASE_URL=https://openrouter.ai/api/v1   (recommended)
     """
+    groq_key = os.getenv("GROQ_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
-    if openrouter_key:
+    if groq_key:
         return LLMProviderConfig(
-            api_key=openrouter_key,
-            base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-            provider="openrouter",
+            api_key=groq_key,
+            base_url=os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1"),
+            provider="groq",
         )
     if openai_key:
         return LLMProviderConfig(
@@ -42,6 +45,13 @@ def get_llm_provider_config() -> LLMProviderConfig:
             base_url=os.getenv("OPENAI_BASE_URL"),
             provider="openai",
         )
+    if openrouter_key:
+        return LLMProviderConfig(
+            api_key=openrouter_key,
+            base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
+            provider="openrouter",
+        )
     raise ValueError(
-        "No LLM API key found. Set OPENAI_API_KEY (OpenAI) or OPENROUTER_API_KEY (OpenRouter)."
+        "No LLM API key found. Set GROQ_API_KEY (Groq), OPENAI_API_KEY (OpenAI), or "
+        "OPENROUTER_API_KEY (OpenRouter)."
     )

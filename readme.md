@@ -124,6 +124,20 @@ Run backend API:
 uvicorn backend.api:app --reload --port 8000
 ```
 
+### Groq (OpenAI-compatible) setup
+
+Set a Groq key in `.env`:
+
+```env
+GROQ_API_KEY=your_groq_key
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+# Groq models change over time; if you get "model decommissioned",
+# use a current model from Groq docs/deprecations.
+OPENAI_SYLLABUS_MODEL=llama-3.1-70b-versatile
+OPENAI_CHAT_MODEL=llama-3.1-8b-instant
+OPENAI_PLANNER_CHAT_MODEL=llama-3.1-70b-versatile
+```
+
 Run frontend:
 
 ```bash

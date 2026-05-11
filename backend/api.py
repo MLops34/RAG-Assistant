@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
 from dataclasses import asdict
 from datetime import date, datetime, time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from app import (
@@ -23,6 +25,8 @@ from core.optimizer import DailyLimits, DeepWorkWindow, StudyScheduler
 from core.parser import parse_syllabus_pdf
 from langchain_openai import ChatOpenAI
 from models.syllabus import ParsedSyllabus
+
+load_dotenv()
 
 
 class ParseResponse(BaseModel):
@@ -84,6 +88,55 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/debug/config")
+def debug_config() -> dict[str, object]:
+    """
+    Safe runtime config snapshot (no secrets).
+    Use this to confirm which provider/base_url/models are being used.
+    """
+    try:
+        cfg = get_llm_provider_config()
+        provider = cfg.provider
+        base_url = cfg.base_url
+    except Exception:
+        provider = "unknown"
+        base_url = os.getenv("OPENAI_BASE_URL")
+    return {
+        "provider": provider,
+        "base_url": base_url,
+        "models": {
+            "syllabus": os.getenv("OPENAI_SYLLABUS_MODEL"),
+            "chat": os.getenv("OPENAI_CHAT_MODEL"),
+            "planner": os.getenv("OPENAI_PLANNER_CHAT_MODEL"),
+            "embedding": os.getenv("OPENAI_EMBEDDING_MODEL"),
+        },
+    }
+
+
+@app.get("/debug/openrouter-models")
+def debug_openrouter_models(limit: int = 30) -> dict[str, object]:
+    """
+    Lists available model IDs from OpenRouter.
+    Helpful when you hit 'No endpoints found for <model>'.
+    """
+    cfg = get_llm_provider_config()
+    if cfg.provider != "openrouter":
+        raise HTTPException(status_code=400, detail="Not using OpenRouter provider.")
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/models",
+        headers={"Authorization": f"Bearer {cfg.api_key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310
+            payload = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Failed to fetch OpenRouter models: {exc}") from exc
+    items = payload.get("data", [])
+    ids = [item.get("id") for item in items if isinstance(item, dict) and item.get("id")]
+    return {"count": len(ids), "ids": ids[: max(1, min(int(limit), 200))]}
 
 
 @app.post("/api/parse", response_model=ParseResponse)

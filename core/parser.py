@@ -108,19 +108,121 @@ def _merge_unique_topics(base: ParsedSyllabus, incoming: ParsedSyllabus) -> None
             existing_exam_keys.add(exam_key)
 
 
+def _tables_to_markdown(tables: list[list[list[str | None]]]) -> str:
+    """
+    Convert extracted tables into a simple markdown representation.
+    `tables` is list[table] where table is list[row] and row is list[cell].
+    """
+    blocks: list[str] = []
+    for t_idx, table in enumerate(tables, start=1):
+        if not table or not any(row for row in table):
+            continue
+        # Normalize all cells to strings.
+        norm_rows: list[list[str]] = []
+        for row in table:
+            norm_rows.append([("" if c is None else str(c)).strip() for c in row])
+        # Skip ultra-empty tables.
+        if sum(1 for r in norm_rows for c in r if c) < 3:
+            continue
+        header = norm_rows[0]
+        col_count = max(1, len(header))
+        header = (header + [""] * col_count)[:col_count]
+        sep = ["---"] * col_count
+        body = norm_rows[1:] if len(norm_rows) > 1 else []
+
+        md = [f"[Table {t_idx}]", "|" + "|".join(header) + "|", "|" + "|".join(sep) + "|"]
+        for row in body[:50]:
+            row = (row + [""] * col_count)[:col_count]
+            md.append("|" + "|".join(row) + "|")
+        blocks.append("\n".join(md))
+    return "\n\n".join(blocks).strip()
+
+
+def _extract_with_pdfplumber(path: Path) -> str:
+    import pdfplumber
+
+    texts: list[str] = []
+    all_tables: list[list[list[str | None]]] = []
+    with pdfplumber.open(str(path)) as pdf:
+        for page in pdf.pages:
+            txt = page.extract_text(x_tolerance=2, y_tolerance=2)
+            if txt:
+                texts.append(txt)
+            try:
+                tables = page.extract_tables()
+                if tables:
+                    all_tables.extend(tables)
+            except Exception:
+                # table extraction is best-effort
+                pass
+    table_md = _tables_to_markdown(all_tables)
+    combined = "\n\n".join([*texts, table_md] if table_md else texts)
+    return combined
+
+
+def _extract_with_pymupdf(path: Path) -> str:
+    import fitz  # PyMuPDF
+
+    doc = fitz.open(str(path))
+    try:
+        parts: list[str] = []
+        for page in doc:
+            t = page.get_text("text")
+            if t:
+                parts.append(t)
+        return "\n\n".join(parts)
+    finally:
+        doc.close()
+
+
 def extract_text_from_pdf(path: PathLike) -> str:
-    """Extract plain text from a PDF file."""
+    """
+    Extract text from PDF with robust fallbacks.
+
+    Strategy:
+    - Try `pdfplumber` (good layout + table extraction)
+    - If weak, try `PyMuPDF` (often better than pypdf on many PDFs)
+    - Fallback to `pypdf` (baseline)
+    """
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"PDF not found: {path}")
 
-    reader = PdfReader(str(path))
-    parts: list[str] = []
-    for page in reader.pages:
-        t = page.extract_text()
-        if t:
-            parts.append(t)
-    return _normalize_extracted_text("\n\n".join(parts).strip())
+    extracted_variants: list[str] = []
+
+    # 1) pdfplumber (layout + tables)
+    try:
+        extracted_variants.append(_extract_with_pdfplumber(path))
+    except Exception:
+        pass
+
+    # 2) PyMuPDF text
+    try:
+        extracted_variants.append(_extract_with_pymupdf(path))
+    except Exception:
+        pass
+
+    # 3) pypdf baseline
+    try:
+        reader = PdfReader(str(path))
+        parts: list[str] = []
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                parts.append(t)
+        extracted_variants.append("\n\n".join(parts).strip())
+    except Exception:
+        pass
+
+    # Pick the best by "word count" heuristic.
+    best = ""
+    best_score = -1
+    for text in extracted_variants:
+        score = len(re.findall(r"[A-Za-z]{3,}", text or ""))
+        if score > best_score:
+            best = text or ""
+            best_score = score
+    return _normalize_extracted_text(best.strip())
 
 
 def _parse_with_llm_single(text: str, max_chars: int = _DEFAULT_MAX_CHARS_FOR_LLM) -> ParsedSyllabus:
